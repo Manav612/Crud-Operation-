@@ -1,4 +1,6 @@
+import jwt from "jsonwebtoken";
 import User from "../model/userModel.js";
+import bcrypt from "bcrypt";
 
 export const create = async (req, res) => {
   try {
@@ -60,6 +62,57 @@ export const deleteData = async (req, res) => {
     // Respond with a success message
     res.status(200).json({ message: "User deleted successfully." });
   } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+export const register = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ name, email, password: hashedPassword });
+    await newUser.save();
+
+    res.status(201).json({ message: "User registered successfully!" });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ error: "User not found" });
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+      process.env.JWT_SECRET_CODE
+    );
+
+    res.cookie("tooken", token);
+
+    // Send user data
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      token: token,
+    });
+  } catch (error) {
+    console.log(error?.stack);
+
     res.status(500).json({ error: "Internal server error." });
   }
 };
